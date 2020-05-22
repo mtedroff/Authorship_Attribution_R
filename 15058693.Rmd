@@ -1,15 +1,7 @@
 ---
 title: "Authorship Attribution, Applied Data Science at UCL, 2020"
-author: Student id 15058693, candidate nr FDWD6
 output: html_notebook
 ---
-
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
-
----
-#This is student 15058693 code submission for the Data Science Project. The structure follows: loading libraries, importing data, modelling linguistic properties/stylometric analysis, classification and training, results, and the code for (web) data collection is pasted in the very final section to not confuse with the rest of the analysis.
 
 # Load the libraries
 ```{r, message=FALSE, warning=FALSE}
@@ -52,8 +44,7 @@ df <- gather(df, key="author",value="text")
 df$text <- tolower(df$text)
 ```
 
-
-# Here I begin modelling the linguistic properties of the text/stylometric analysis of the text. I will look at number of sentences, number of sentences per author, average sentence length, number of words, distribution of number of words, number of words by author, word length, and vocabulary size to see if there are any interesting findings.
+# Modelling of Linguistic Properties
 
 ## number of sentences
 
@@ -63,7 +54,7 @@ df$text <- tolower(df$text)
 df$n_sentences <- nsentence(df$text)
 ggplot(df, aes(n_sentences)) + geom_histogram(color = "white")+ggtitle("Distribution of Number of Sentences")+xlab("Number of Sentences")+ylab("Count")
 ```
-# I was curious to see the distribution and surprised to see that it is not normally distributed, but rather follows a multimodal distribution.
+# Not normal distribution, it follows a multimodal distribution.
 
 ### Distribution of number of sentences by Author using ggplot
 ```{r}
@@ -93,7 +84,7 @@ ggplot(df, aes(author,num_words)) + geom_boxplot(alpha = 0.3)+ggtitle("Distribut
 
 From the above boxpl it is clear that there is a difference between the distirbuiton of words per text for each author. Again, Lisa_suennen seems to be an outlier.
 
-### Now I will look at average number of words by author
+### Average number of words by author
 
 ```{r}
 avg_words <- df %>% 
@@ -162,7 +153,6 @@ ggplot(avg_vocab_size, aes(author, avg_vocab))+geom_col()+coord_flip()+ggtitle("
 Again, lisa_suennen has the highest average vocabulary size, followed by david_cohen. Womeninvest has the lowest vocabulary size.
 
 ## number of commas
-### Here I look at average number of commas by author, just too identify if there are any more specific features that could seperate them apart. First one is distribution
 
 ```{r}
 df$num_commas <- str_count(df$text, ",")
@@ -187,7 +177,7 @@ Again, lisa_suennen has the highest average number of commas followed by david_c
 dfmat_author <- dfm(toks_authors)
 print(dfmat_author)
 ```
-Dataset consists of 5000 documents, 43,205 features and 99.6% sparse and 1 docvar. The 99.6% sparsity would suggest to remove some sparseterms..
+Dataset consists of 5000 documents, 43,205 features and 99.6% sparse and 1 docvar. The 99.6% sparsity would suggest to remove some sparseterms.
 
 
 ```{r}
@@ -235,7 +225,6 @@ top words used by each author. N =8 is more or less arbitrary
 tstat_freq <- textstat_frequency(dfmat_author_nostop, n = 10, groups = "author")
 pander(tstat_freq)
 ```
-From observation, there are a few overlaps like "can" and "on". Interesting to see "women" and "kids" being top 8 for two female authors. Overall quite rich diversity.. Stop words have been removed which could explain why it doesn't follow common english words
 
 ```{r}
 # Visualisation of above findings
@@ -290,8 +279,6 @@ plot(user_clust)
  
 ```
 
-Again, note Lisa Suennen
-
 # Now let's move on to the classification part, and training and testing after defining features. 
 
 ## The corpus needs to be split into training and testing.
@@ -343,18 +330,16 @@ tab_class <- table(actual_class, predicted_class)
 tab_class
 ```
 
-
 # Now let's look at the performance of the classification 
 ```{r}
 confusionMatrix(tab_class, mode = "everything")
 ```
 # Results
 
-The model has an accuarcy of 0.826 (82.60%) on the testing data, which is overall  very good to identify these authors based on text data specifically. As seen, looking at statistics by class, some report very high numbers. The model in good in identifying author based on text data, but not perfect. See results and discussion in the report.
+The model has an accuarcy of 0.826 (82.60%) on the testing data, which is overall  very good to identify these authors based on text data specifically. The model in good in identifying author based on text data, but not perfect. See results and discussion in the report.
 
 # DATA COLLECTION / ANNEX
 # Here is the code used for gathering the data. Libraries used writexl, jsonlite, rvest, stringr
-#I have pasted the code in one section to make it easy to retrieve all data at the same time
 
 ```{r, message=FALSE, warning=FALSE}
 
