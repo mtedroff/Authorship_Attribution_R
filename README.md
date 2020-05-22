@@ -1,6 +1,6 @@
 # Authorship_Attribution_R
 
-This study is part of the course SECU0057 Applied Data Science at UCL, and aims to classify the author of a given text accurately. This corpus contains 10 bloggers with 500 data points each, where one data point contains 400-1500 words. Data was collected through web-scraping 10 individual blogs covering topics related to venture capital, technology, and entrepreneurship. In this corpus, several standard stylometric variables were calculated, including word length, vocabulary diversity, word frequency, and n-grams, including bigrams and trigrams. A Naïve Bayes classifier algorithm was trained on the data set together with TF-IDF as a feature selection method, resulting in an accuracy of 82.6%.
+This study is part of the course SECU0057 Applied Data Science at UCL, and aims to classify the author of a given text accurately. This corpus contains 10 bloggers with 500 data points each, where one data point contains 400-1500 words. Data was collected through web-scraping 10 individual blogs covering topics related to venture capital, technology, and entrepreneurship. In this corpus, several standard stylometric variables were calculated, including word length, vocabulary diversity, word frequency, and n-grams, including bigrams and trigrams. A Naïve Bayes classifier algorithm was trained on the data set together with TF-IDF as a feature selection method. It had an accuarcy of 0.826 on the testing data. It can 82.60% accurately identify authors based on text.
 
 # Background
 
