@@ -1,0 +1,647 @@
+---
+title: "Authorship Attribution, Applied Data Science at UCL, 2020"
+author: Student id 15058693, candidate nr FDWD6
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+---
+#This is student 15058693 code submission for the Data Science Project. The structure follows: loading libraries, importing data, modelling linguistic properties/stylometric analysis, classification and training, results, and the code for (web) data collection is pasted in the very final section to not confuse with the rest of the analysis.
+
+# Load the libraries
+```{r, message=FALSE, warning=FALSE}
+# load the libraries and packages used in this report. I have mostly used packages I am familiar with from the datasciene-module. These packages are commonly used in textmining and stylometric analysis.
+
+# used in analysis and classification:
+library(readxl)
+library(tidyr)
+library(quanteda)
+library(caret)
+library(ggplot2)
+library(quanteda.textmodels)
+library(tidyverse)
+library(pander)
+library(e1071)
+
+#used for web data collection:
+library(jsonlite)
+library(rvest)
+library(stringr)
+library(svMisc)
+```
+
+
+# Import data set from local file (data_points.xlsx)
+```{r}
+library(readxl)
+data_points <- read_excel("~/Documents/data_points.xlsx")
+View(data_points)
+# load dataset
+df <- read_excel("~/Documents/data_points.xlsx")
+# print the first rows of each authors of the data set, as a preview
+head(df)
+```
+
+```{r}
+# need to convert data from a wide format to a long format:
+df <- gather(df, key="author",value="text")
+# make text lowercase df$text to lowercase
+df$text <- tolower(df$text)
+```
+
+
+# Here I begin modelling the linguistic properties of the text/stylometric analysis of the text. I will look at number of sentences, number of sentences per author, average sentence length, number of words, distribution of number of words, number of words by author, word length, and vocabulary size to see if there are any interesting findings.
+
+## number of sentences
+
+### Distrubtion of no of Sentences
+```{r}
+# number of sentences
+df$n_sentences <- nsentence(df$text)
+ggplot(df, aes(n_sentences)) + geom_histogram(color = "white")+ggtitle("Distribution of Number of Sentences")+xlab("Number of Sentences")+ylab("Count")
+```
+# I was curious to see the distribution and surprised to see that it is not normally distributed, but rather follows a multimodal distribution.
+
+### Distribution of number of sentences by Author using ggplot
+```{r}
+ggplot(df, aes(author,n_sentences)) + geom_boxplot(alpha = 0.5)+ggtitle("Distribution of Number of Sentences by Author")+xlab("Author")+ylab("Count")+coord_flip()
+```
+
+This boxpl clearly reveal that there is a difference between the distribution of no of sentences per text for the different authors.Lisa_suennen's data seems to be flawed.
+
+### Here I look at the average sentence length, two display options for visualisation purposes
+
+```{r}
+avg_n_sentences <- df %>% 
+    group_by(author) %>% 
+    summarise(avg_n_sentences = mean(n_sentences))
+pander(avg_n_sentences)
+ggplot(avg_n_sentences, aes(author, avg_n_sentences))+geom_col()+coord_flip()+ggtitle("Average Nubmer of Sentences by Author")+xlab("Author")+ylab("Average Sentence Length")
+```
+
+Lisa_suennen has clearly the highest average number of Sentences with 6.288 followed by david_cohen with 3.808. This is probably due to misrepresentation in Lisa's data set which should have been adjusted, and that I did something wrong in the data collection. 
+
+## number of words
+
+### Distribution of Number of Words by Author
+```{r}
+ggplot(df, aes(author,num_words)) + geom_boxplot(alpha = 0.3)+ggtitle("Distribution of Number of Words by Author")+xlab("Author")+ylab("Count")+coord_flip()
+```
+
+From the above boxpl it is clear that there is a difference between the distirbuiton of words per text for each author. Again, Lisa_suennen seems to be an outlier.
+
+### Now I will look at average number of words by author
+
+```{r}
+avg_words <- df %>% 
+    group_by(author) %>% 
+    summarise(avg_words = mean(num_words))
+pander(avg_words)
+ggplot(avg_words, aes(author, avg_words))+geom_col()+coord_flip()+ggtitle("Average Nubmer of Words by Author")+xlab("Author")+ylab("Average Number of Words")
+```
+
+Again, lisa_suennen has the highest average number of words, followed by david_cohen. Further investigation of this will be discussed in the report.
+
+
+## word length
+
+
+```{r}
+# first, create corpus
+
+author_corpus <- corpus(df$text, 
+                     docvars = data.frame(author = df$author))
+print(author_corpus)
+
+# summary
+summary(author_corpus, 5)
+```
+
+```{r}
+# now convert to word tokens 
+toks_authors <- tokens(author_corpus,  remove_punct = TRUE, remove_symbols = TRUE,
+                       remove_numbers = TRUE, remove_url = TRUE)
+
+```
+```{r}
+word_lengths <- list()
+for(i in 1:length(toks_authors)){
+    word_lengths[[i]] <- nchar(toks_authors[[i]])
+}
+word_length_list <-data.frame(word_lengths= unlist(word_lengths))
+
+```
+
+### Word Length by Author
+
+```{r}
+# just the author items
+author_word_length <- tapply(as.vector(word_lengths),df$author, function(x){mean(unlist(x))})
+# this needs to be converted to dataframe
+author_word_length <- data.frame(author=names(author_word_length),word_length=author_word_length)
+pander(author_word_length)
+ggplot(author_word_length, aes(author, word_length))+geom_col()+coord_flip()+ggtitle("Average Word Length by Author")+xlab("Author")+ylab("Average Word Length")
+```
+Here the numbers are more even. jalak has the highest average word length followd by tanya_basu 
+
+## vocabulary size
+### Average Vocabulary Size by Author
+
+```{r}
+avg_vocab_size <- df %>% 
+    group_by(author) %>% 
+    summarise(avg_vocab = mean(vocab_size))
+pander(avg_vocab_size)
+ggplot(avg_vocab_size, aes(author, avg_vocab))+geom_col()+coord_flip()+ggtitle("Average Vocabulary Size by Author")+xlab("Author")+ylab("Average Vocabulary Size")
+```
+
+
+Again, lisa_suennen has the highest average vocabulary size, followed by david_cohen. Womeninvest has the lowest vocabulary size.
+
+## number of commas
+### Here I look at average number of commas by author, just too identify if there are any more specific features that could seperate them apart. First one is distribution
+
+```{r}
+df$num_commas <- str_count(df$text, ",")
+ggplot(df, aes(num_commas)) + geom_histogram(color = "white")+ggtitle("Distribution of Number of Commas")+xlab("Number of Commas")+ylab("Count")
+```
+Number of commas following a bimodal distribution.
+
+```{r}
+avg_commas <- df %>% 
+    group_by(author) %>% 
+    summarise(avg_commas = mean(num_commas))
+pander(avg_commas)
+ggplot(avg_commas, aes(author, avg_commas))+geom_col()+coord_flip()+ggtitle("Average Nubmer of Commas by Author")+xlab("Author")+ylab("Average Number of Commas")
+```
+
+Again, lisa_suennen has the highest average number of commas followed by david_cohen. womeninvest has the lowest average number of commas.
+
+# now let's look at vocabulary diversity. First I need to make a DFM , using tokens object. 
+
+```{r}
+ # construct a document-feature matrix (DFM)
+dfmat_author <- dfm(toks_authors)
+print(dfmat_author)
+```
+Dataset consists of 5000 documents, 43,205 features and 99.6% sparse and 1 docvar. The 99.6% sparsity would suggest to remove some sparseterms..
+
+
+```{r}
+# text pre-processing: remove stopwords 
+dfmat_author_nostop <- dfm_remove(dfmat_author, pattern = stopwords('en'))
+print(dfmat_author_nostop)
+```
+
+```{r}
+# group by author
+dfmat_author_group <- dfm_group(dfmat_author_nostop, groups = "author")
+print(dfmat_author_group)
+
+#display head
+head(colSums(dfmat_author_group), 10)
+```
+Here sparsity is down to 77.1%
+
+## measure vocabulary diversity
+
+```{r}
+# lexical diversity and type token ratio
+tstat_lexdiv <- textstat_lexdiv(dfmat_author_group)
+pander(tstat_lexdiv)
+```
+Vocabulary Diveristy based on TTR, i.e. Type token ratio
+
+```{r}
+# ttr
+plot(tstat_lexdiv$TTR, type = 'l', xaxt = 'n', xlab = NULL, ylab = "TypeTokenRatio")
+grid()
+axis(3, at = seq_len(nrow(tstat_lexdiv)), labels = dfmat_author_group$author)
+
+ggplot(tstat_lexdiv, aes(document, TTR))+geom_col()+coord_flip()+ggtitle("Average Word Length by Author")+xlab("Author")+ylab("TTR")
+```
+the higher the TTR, the higher lexical variation
+
+womeninvest has the highest vocabulary diversity and lisa_suennens has the lowest vocabulary diversity 
+
+
+# now let's look at word frequency and most used words
+
+top words used by each author. N =8 is more or less arbitrary
+```{r}
+tstat_freq <- textstat_frequency(dfmat_author_nostop, n = 10, groups = "author")
+pander(tstat_freq)
+```
+From observation, there are a few overlaps like "can" and "on". Interesting to see "women" and "kids" being top 8 for two female authors. Overall quite rich diversity.. Stop words have been removed which could explain why it doesn't follow common english words
+
+```{r}
+# Visualisation of above findings
+tstat_freq %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequency") +
+  theme_minimal()+facet_grid(~group)
+```
+
+
+# n-grams, of syllabes
+
+## top bigrams, bigrams is an n-gram when n=2
+
+```{r}
+tokens_bigram <- tokens_ngrams(toks_authors, n = 2:2)
+head(tokens_bigram[[1]], 4)
+tail(tokens_bigram[[1]], 4)
+tokens_bigram <- dfm(tokens_bigram)
+```
+
+# top bigrams by each author with n set to 4
+```{r}
+tstat_freq_bi <- textstat_frequency(toks_bigram, n = 4, groups = "author")
+pander(tstat_freq_bi)
+```
+
+## Top Trigrams (n-gram when n = 3)
+
+```{r}
+toks_trigram <- tokens_ngrams(toks_authors, n = 2:2)
+head(toks_trigram[[1]], 4)
+tail(toks_trigram[[1]], 4)
+toks_trigram <- dfm(toks_trigram)
+```
+
+##trigrams used by each author
+```{r}
+tstat_freq_tri <- textstat_frequency(toks_trigram, n = 4, groups = "author")
+pander(tstat_freq_tri)
+```
+
+# similarity between authors  displayed as cluster dendrogram
+
+```{r}
+#calcuates similarites of documents or features
+tstat_dist <- as.dist(textstat_dist(dfmat_author_group))
+user_clust <- hclust(tstat_dist)
+plot(user_clust)
+ 
+```
+
+Again, note Lisa Suennen
+
+# Now let's move on to the classification part, and training and testing after defining features. 
+
+## The corpus needs to be split into training and testing.
+
+```{r}
+# first, create an id for train and test
+set.seed(40)
+id_train <- sample(1:nrow(df), nrow(df)*0.70, replace = FALSE)
+head(id_train, 10)
+```
+
+```{r}
+# second, create docvar with id
+author_corpus$id_numeric <- 1:ndoc(author_corpus)
+
+# now, get training set
+dfmat_training <- corpus_subset(author_corpus, id_numeric %in% id_train) %>%
+    # first, as text pre processing, do stemming and cleaning by removing stopwords and punctuation
+    dfm(remove = stopwords("english"), stem = TRUE, remove_punct = TRUE)
+# then convert to tf-idf which will be used for weighting
+dfmat_training <- dfm_tfidf(dfmat_training)
+# get test set (documents not in id_train)
+dfmat_test <- corpus_subset(author_corpus, !id_numeric %in% id_train) %>%
+    dfm(remove = stopwords("english"), stem = TRUE,  remove_punct = TRUE)
+# convert to tfi-df
+dfmat_test <- dfm_tfidf(dfmat_test)
+```
+
+## fit the model
+```{r}
+# fitting
+tmod_nb <- textmodel_nb(dfmat_training, dfmat_training$author)
+# lets print model summary and see est feature scores
+summary(tmod_nb)
+```
+```{r}
+# find matching 
+dfmat_matched <- dfm_match(dfmat_test, features = featnames(dfmat_training))
+```
+
+#Predict using naive bayes
+
+```{r}
+# actual class
+actual_class <- dfmat_matched$author
+# predict using naive bayes
+predicted_class <- predict(tmod_nb, newdata = dfmat_matched)
+tab_class <- table(actual_class, predicted_class)
+tab_class
+```
+
+
+# Now let's look at the performance of the classification 
+```{r}
+confusionMatrix(tab_class, mode = "everything")
+```
+# Results
+
+The model has an accuarcy of 0.826 (82.60%) on the testing data, which is overall  very good to identify these authors based on text data specifically. As seen, looking at statistics by class, some report very high numbers. The model in good in identifying author based on text data, but not perfect. See results and discussion in the report.
+
+# DATA COLLECTION / ANNEX
+# Here is the code used for gathering the data. Libraries used writexl, jsonlite, rvest, stringr
+#I have pasted the code in one section to make it easy to retrieve all data at the same time
+
+```{r, message=FALSE, warning=FALSE}
+
+#setting the ranges
+
+get_datapoints <- function(posts){
+        all_posts <- unlist(posts) %>% unique(.) %>% paste(, collapse = " ") %>% str_squish()
+        all_sentences <- all_posts %>% strsplit("\\.") %>% .[[1]] %>% str_trim()
+        all_sentences <- all_sentences[all_sentences != ""]
+        number_of_sentences_per_datapoint = floor(length(all_sentences) / 500)
+        index_range <- seq(1, length(all_sentences), number_of_sentences_per_datapoint)
+        
+        data_points <- list()
+        for (i in seq_along(index_range)){
+                if (i == length(index_range)){
+                        break
+                }
+                start_index <- index_range[i]
+                next_index <- index_range[i + 1]
+                dp = all_sentences[start_index:(next_index - 1)]
+                data_point <- paste(dp, collapse = ". ")
+                data_points[[i]] <- data_point
+        }
+        return(unlist(data_points)[1:500])
+}
+
+#Here comes authors 1-10
+
+## 1. Sam Altman
+get_sam_altman_posts <- function(){
+        sam_altman_url <- "https://blog.samaltman.com/"
+        webpage <- read_html(sam_altman_url)
+        #select attributes and notes by inspecting elements on the site
+        last_page_number <- webpage %>% html_nodes(".last a") %>% html_attr("href") %>% 
+                strsplit(., "=") %>% .[[1]] %>% .[2] %>% as.numeric()
+        
+        all_paragraphs <- list()
+        for(i in 1:last_page_number){
+                webpage <- read_html(paste0(sam_altman_url, "?page=", i))
+                paragraphs_per_page <- webpage %>% html_nodes("p") %>% html_text(trim = TRUE) %>% 
+                        paste(., collapse = " ")
+                all_paragraphs[[i]] <- paragraphs_per_page
+                svMisc::progress
+        } 
+        return(all_paragraphs)
+}
+
+sam_altman_posts <- get_sam_altman_posts()
+sam_altman = get_datapoints(sam_altman_posts)
+
+## 2. Paul Graham
+
+get_paul_graham_posts <- function(){
+        paul_graham_url <- "http://www.paulgraham.com/articles.html"
+        webpage <- read_html(paul_graham_url)
+        # get the links of his posts and select attributes and nodes
+        posts_urls <- webpage %>% html_nodes("img+ font a") %>% html_attr("href")
+        # choose only valid posts urls
+        posts_urls <- posts_urls[grep("html", posts_urls)]
+        # append the url to posts_urls
+        posts_urls <- paste0("http://www.paulgraham.com/", posts_urls)
+        
+        posts <- list()
+        for (i in seq_along(posts_urls)){
+                webpage <- read_html(posts_urls[i])
+                post = webpage %>% html_nodes('br+ font') %>% html_text(trim = TRUE) %>% strsplit("\\d{4}") %>% 
+                        .[[1]] %>% .[2]
+                posts[[i]] <- post
+                svMisc::progress(i, length(posts_urls))
+        }
+        return(posts)
+}
+
+paul_graham_posts <- get_paul_graham_posts()
+
+paul_graham <- get_datapoints(paul_graham_posts)
+
+
+## 3. Andrew Chen
+get_andrew_chen_posts <- function(){
+        andrew_chen_url <- "https://andrewchen.co/list-of-essays/"
+        webpage <- read_html(andrew_chen_url)
+        # get the links and identify nodes and attributes
+        posts_urls <- webpage %>% html_nodes("li a") %>% html_attr("href")
+        
+        posts <- list()
+        for (i in seq_along(posts_urls)){
+                webpage <- read_html(posts_urls[i])
+                posts[[i]] = webpage %>% html_nodes(".main > p") %>% html_text(trim = TRUE)
+                svMisc::progress(i, length(posts_urls))
+        }
+        return(posts)
+}
+
+andrew_chen_posts <- get_andrew_chen_posts()
+andrew_chen <- get_datapoints(andrew_chen_posts) 
+
+
+#4. David Cohen
+get_david_cohen_posts <- function(){
+        david_cohen_url <- "https://davidgcohen.com/"
+        
+        count_cohen_pages <- 118
+        posts_urls <- list()
+        for (i in 1:118){
+                webpage <- read_html(paste0(david_cohen_url, 'page/', i))
+                # get the links and identify nodes and attributed
+                posts_urls[[i]] <- webpage %>% html_nodes(".h1 a") %>% html_attr("href")
+                svMisc::progress(i, count_cohen_pages)
+        }
+        posts_urls <- unlist(posts_urls)[1:500]
+        
+        posts <- list()
+        for (i in seq_along(posts_urls)){
+                webpage <- read_html(posts_urls[i])
+                posts[[i]] = webpage %>% html_nodes("p") %>% html_text(trim = TRUE)
+                svMisc::progress(i, length(posts_urls))
+        }
+        return(posts)
+}
+
+david_cohen_posts <- get_david_cohen_posts()
+david_cohen <- get_datapoints(david_cohen_posts) 
+
+
+## 5. Tanya Basu
+get_tanya_basu_posts <- function(){
+        tanya_basu_url <- "https://www.technologyreview.com/author/tanya-basu"
+        webpage <- read_html(tanya_basu_url)
+        count_of_posts <- webpage %>% html_nodes(".authorPage__postCountWrapper--2zoMK") %>% html_text() %>% 
+                str_extract("\\d+") %>% as.numeric()
+        total_pages <- ceiling(count_of_posts / 10)
+        
+        posts_urls <- list()
+        for (i in 1:total_pages){
+                url <- paste0("https://wp.technologyreview.com/wp-json/irving/v1/data/author_archive?author=cap-tanya-basu&page=", i)
+                df <- fromJSON(url)
+                posts_urls[[i]] <- df$config$permalink        
+        }
+        posts_urls <- unlist(posts_urls)
+        
+        selector <- ".gutenbergContent__content--1FgGp p"
+        
+        posts <- get_all_paragraphs(posts_urls, selector)
+        return(posts)
+}
+
+
+tanya_basu_posts <- get_tanya_basu_posts()
+tanya_basu <- get_datapoints(tanya_basu_posts) 
+
+
+## 6. Bill Gurley
+get_bill_gurley_posts <- function(){
+        bill_gurley_url <- "http://abovethecrowd.com/"
+        
+        count_gurley_pages <- 24
+        posts_urls <- list()
+        for (i in 1:count_gurley_pages){
+                webpage <- read_html(paste0(bill_gurley_url, 'page/', i))
+                # get the links of his posts
+                posts_urls[[i]] <- webpage %>% html_nodes(".post-title a") %>% html_attr("href")
+                svMisc::progress(i, count_gurley_pages)
+        }
+        posts_urls <- unlist(posts_urls)
+        
+        posts <- list()
+        for (i in seq_along(posts_urls)){
+                webpage <- read_html(posts_urls[i])
+                posts[[i]] = webpage %>% html_nodes(".post-content p") %>% html_text(trim = TRUE)
+                svMisc::progress(i, length(posts_urls))
+        }
+        return(posts)
+}
+
+bill_gurley_posts <- get_bill_gurley_posts()
+bill_gurley <- get_datapoints(bill_gurley_posts) 
+
+
+## 7. Jalak Jobanputra
+get_jalak_posts <- function(){
+        jalak_url <- "http://thebarefootvc.com/"
+        
+        count_jalak_pages <- 10
+        posts_urls <- list()
+        for (i in 1:count_jalak_pages){
+                webpage <- read_html(paste0(jalak_url, 'page/', i))
+                # get the links of his posts and selecg attributes
+                posts_urls[[i]] <- webpage %>% html_nodes(".entry-title") %>% html_attr("href")
+                svMisc::progress(i, count_jalak_pages)
+        }
+        posts_urls <- unlist(posts_urls)
+        
+        posts <- list()
+        for (i in seq_along(posts_urls)){
+                webpage <- read_html(posts_urls[i])
+                posts[[i]] = webpage %>% html_nodes(".entry-content p") %>% html_text(trim = TRUE) %>% .[-length(.)]
+                svMisc::progress(i, length(posts_urls))
+        }
+        return(posts)
+}
+
+jalak_posts <- get_jalak_posts()
+jalak <- get_datapoints(jalak_posts) 
+
+
+## 8. womeninvest aka Carol A. Curley 
+get_womeninvest_posts <- function(){
+        womeninvest_url <- "https://womeninvest.nyc/"
+        
+        count_womeninvest_pages <- 5
+        posts_urls <- list()
+        for (i in 1:count_womeninvest_pages){
+                webpage <- read_html(paste0(womeninvest_url, 'page/', i))
+                # get the links of his posts and select attributes
+                posts_urls[[i]] <- webpage %>% html_nodes(".entry-title a") %>% html_attr("href")
+                svMisc::progress(i, count_womeninvest_pages)
+        }
+        posts_urls <- unlist(posts_urls)
+        
+        posts <- list()
+        for (i in seq_along(posts_urls)){
+                webpage <- read_html(posts_urls[i])
+                posts[[i]] = webpage %>% html_nodes("#content li , .entry-content > p:nth-child(1)") %>% html_text(trim = TRUE) #%>% .[!. == ""]
+                svMisc::progress(i, length(posts_urls))
+        }
+        return(posts)
+}
+
+womeninvest_posts <- get_womeninvest_posts()
+womeninvest <- get_datapoints(womeninvest_posts) 
+
+
+## 9. Likes and Launch aka Brittany Laughlin
+get_brittany_posts <- function(){
+        brittany_url <- "https://likesandlaunch.com/"
+        webpage <- read_html(brittany_url)
+        last_page_number <- webpage %>% html_nodes("#pagecount") %>% html_text(trim = TRUE) %>% 
+                strsplit(., "of ") %>% .[[1]] %>% .[2] %>% as.numeric()
+        
+        all_paragraphs <- list()
+        for(i in 1:last_page_number){
+                webpage <- read_html(paste0(brittany_url, "page/", i))
+                paragraphs_per_page <- webpage %>% html_nodes("p") %>% html_text(trim = TRUE) %>% 
+                        paste(., collapse = " ")
+                all_paragraphs[[i]] <- paragraphs_per_page
+                svMisc::progress(i, last_page_number)
+        } 
+        return(all_paragraphs)
+}
+
+brittany_posts <- get_brittany_posts()
+brittany <- get_datapoints(brittany_posts) 
+
+
+## 10. VentureValkyrie (Lisa Suennen)
+get_lisa_suennen_posts <- function(){
+        lisa_suennen_url <- "https://venturevalkyrie.com/"
+        
+        count_lisa_suennen_pages <- 65
+        posts_urls <- list()
+        for (i in 1:count_lisa_suennen_pages){
+                webpage <- read_html(paste0(lisa_suennen_url, 'page/', i))
+                # get the links of posts
+                posts_urls[[i]] <- webpage %>% html_nodes(".entry-title-link") %>% html_attr("href")
+                svMisc::progress(i, count_lisa_suennen_pages)
+        }
+        posts_urls <- unlist(posts_urls)
+        
+        posts <- list()
+        for (i in seq_along(posts_urls)){
+                webpage <- read_html(posts_urls[i])
+                posts[[i]] = webpage %>% html_nodes(".entry-content p") %>% html_text(trim = TRUE) #%>% .[!. == ""]
+                #display progress
+                svMisc::progress(i, length(posts_urls))
+        }
+        return(posts)
+}
+
+lisa_suennen_posts <- get_lisa_suennen_posts()
+lisa_suennen <- get_datapoints(lisa_suennen_posts)
+
+# compile all data points in a data frame
+all_data_points <- data.frame(sam_altman, paul_graham, andrew_chen, david_cohen,
+                              tanya_basu, bill_gurley, jalak, womeninvest, 
+                              brittany, lisa_suennen)
+
+# write to Excel
+write_xlsx(all_data_points, "data_points.xlsx")
+```
